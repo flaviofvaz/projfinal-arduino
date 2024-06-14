@@ -1,177 +1,145 @@
-#include <string>
-#include <list>
-#include <tuple>
 #include "Components.h"
 
-using namespace std;
+Component::Component() {};
 
-class Component 
-{      
-  public:          
-    tuple<int, int> ports;  
-    Component(tuple<int, int> ports) 
-    { 
-      self.ports = ports;
-    }
+void Component::process() {};
+
+void OutputComponent::process() {};
+void OutputComponent::workButton() {};
+void OutputComponent::workPotentiometer(bool up) {}; 
+void InputComponent::process() {};
+
+ButtonComponent::ButtonComponent(int port1, int port2) 
+{
+  ports[0] = port1;
+  ports[1] = port2;
+  arduinoButton = new GFButton(port1);
+  arduinoButton->setPressHandler(ButtonComponent::controlPress);
+  Serial.println("instanciou botao");
+
 };
 
-class OutputComponent: public Component 
+void ButtonComponent::controlPress()
 {
-  public:
-    OutputComponent(tuple<int, int> ports): Component(ports) {};
-    
-    void workButton () {};
-    void workPotentiometer (bool up) {};
-};
-
-class InputComponent: public Component
-{
-  public:
-    InputComponent(tuple<int, int> ports): Component(ports) {};
-    void process(list<OutputComponent>) {};
+  Serial.println("apertou botao");
+  for (int i = 0; i < connectedComponents->size(); i++) 
+  {
+    connectedComponents->get(i).workButton();
+    Serial.println(i);
+  }
 }
-
-class ButtonComponent: public InputComponent 
-{
-  private:
-    GFButton* arduinoButton;
-  public:
-    ButtonComponent(tuple<int, int> ports): InputComponent(ports) 
-    {
-      arduinoButton = new GFButton(ports[0]);
-    }
     
-    void process(list<OutputComponent> components)
-    {
-      arduinoButton->process();
-      if (arduinoButton->isPressed())
-      {
-        for (auto const& c : components) 
-        {
-          c->workButton();
-        }
-      }
-    }
+void ButtonComponent::process()
+{
+  arduinoButton->process();
 };
 
-class PotentiometerComponent: public InputComponent
-{
-  private: 
-    RotaryEncoder* encoder;
-    int lastPosition = 0;
-    void tickDoEncoder() 
-    {
-      self.encoder->tick();
-    }
-    void loopComponents(list<OutputComponent> components, bool up)
-    {
-      for (auto const& c : components) 
-        {
-          c->workPotentiometer(up);
-        }
-    }
-  public:
-    PotentiometerComponent(tuple<int, int> ports): InputComponent(ports) 
-    {
-      encoder = new encoder(ports[0], ports[1]);
-      int origin1 = digitalPinToInterrupt(ports[0]);
-      attachInterrupt(origin1, tickDoEncoder, CHANGE);
-      int origin2 = digitalPinToInterrupt(ports[1]);
-      attachInterrupt(origem2, tickDoEncoder, CHANGE);
-    }
-    void process(list<OutputComponent> components)
-    {
-      int currentPosition = encoder.getPosition();
-      if (currentPosition > lastPosition) 
-      {
-        up = true;
-        loopComponents(true);
-      }
-      else if (currentPosition < lastPosition)
-      {
-        up = false;
-        loopComponents(false);
-      }
-      lastPosition = currentPosition;
-    }
-}
+// void EncoderComponent::tickDoEncoder() 
+// {
+//   encoder->tick();
+// };
 
-class LedComponent: public OutputComponent 
-{
-  private:
-    bool ledOn = false;
-    bool ledBlinking = false;
-    unsigned long lastInstant = 0;
-    unsigned long blinkInterval = 2000;
-    unsigned long blinkIntervalSteps = 100;
-    unsigned long blinkIntervalMax = 5000;
-    unsigned long blinkIntervalMin = 500;
+// void EncoderComponent::loopComponents(LinkedList<OutputComponent> components, bool up)
+// {
+//   //for (auto const& c : components) 
+//   //  {
+//    //   c->workPotentiometer(up);
+//     //}
+// };
 
-    void turnOn(void)
+// EncoderComponent::EncoderComponent(int ports [2]) 
+// {
+//   encoder = new RotaryEncoder(ports[0], ports[1]);
+// };
+
+// void EncoderComponent::setup()
+// {
+//   int origin1 = digitalPinToInterrupt(ports[0]);
+//   attachInterrupt(origin1, tickDoEncoder, CHANGE);
+//   int origin2 = digitalPinToInterrupt(ports[1]);
+//   attachInterrupt(origin2, tickDoEncoder, CHANGE);
+// };
+
+// void EncoderComponent::process(LinkedList<OutputComponent> components)
+// {
+//  int currentPosition = encoder->getPosition();
+//  bool up;
+//  if (currentPosition > lastPosition) 
+//  {
+//    up = true;
+//    loopComponents(components, true);
+//  }
+//  else if (currentPosition < lastPosition)
+//  {
+//    up = false;
+//    loopComponents(components, false);
+//  }
+//  lastPosition = currentPosition;
+// };
+
+void LedComponent::turnOn(void)
+{
+  digitalWrite(ports[0], LOW);
+  ledOn = true;
+};
+void LedComponent::turnOff(void)
+{
+  digitalWrite(ports[0], HIGH);  
+  ledOn = false;
+};
+LedComponent::LedComponent(int ports [2]) 
+{
+  pinMode(ports[0], OUTPUT);
+};
+void LedComponent::workPotentiometer(bool up)
+{
+  if (up)
+  {
+    blinkInterval -= blinkIntervalSteps;
+    if (blinkInterval < blinkIntervalMin)
     {
-      digitalWrite(self.ports[0], LOW);
-      self.ledOn = true;
+      blinkInterval = blinkIntervalMin;
     }
-    void turnOff(void)
+  }
+  else
+  {
+    blinkInterval += blinkIntervalSteps;
+    if (blinkInterval > blinkIntervalMax)
     {
-      digitalWrite(self.ports[0], HIGH);  
-      self.ledOn = false;
+      blinkInterval = blinkIntervalMax;
     }
-  public:
-    LedComponent(tuple<int, int> ports): OutputComponent(ports) 
+  }
+};
+void LedComponent::workButton(void)
+{
+  if (ledBlinking)
+  {
+    ledBlinking = false;
+    turnOff();
+  }
+  else
+  {
+    ledBlinking = true;
+    lastInstant = millis();
+    turnOn();
+  }
+};
+void LedComponent::process(void)
+{
+  if (ledBlinking)
+  {
+    unsigned long currentInstant = millis();
+    if (currentInstant > lastInstant + blinkInterval) 
     {
-      pinMode(ports[0], OUTPUT);
-    }
-    void workPotentiometer(bool up)
-    {
-      if (up)
+      if (ledOn)
       {
-        self.blinkInterval -= self.blinkIntervalSteps;
-        if (self.blinkInterval < self.blinkIntervalMin)
-        {
-          self.blinkInterval = self.blinkIntervalMin;
-        }
+        turnOff();
       }
       else
       {
-        self.blinkInterval += self.blinkIntervalSteps;
-        if (self.blinkInterval > self.blinkIntervalMax)
-        {
-          self.blinkInterval = self.blinkIntervalMax;
-        }
+        turnOn();
       }
+      lastInstant = currentInstant;
     }
-    void workButton(void)
-    {
-      if (ledBlinking)
-      {
-        self.ledBlinking = false;
-        self.turnOff();
-      }
-      else
-      {
-        self.ledBlinking = true;
-        self.lastInstant = millis();
-        self.turnOn();
-      }
-    }
-    void process(void)
-    {
-      if (self.ledBlinking)
-      {
-        unsigned long currentInstant = millis();
-        if (currentInstant > self.lastInstant + self.blinkInterval) 
-        {
-          if (self.ledOn)
-          {
-            self.turnOff();
-          }
-          else
-          {
-            self.turnOn();
-          }
-          self.lastInstant = currentInstant;
-        }
-      }
-    }
+  }
 };
