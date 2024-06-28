@@ -4,36 +4,77 @@ Component::Component() {};
 
 void Component::process() {};
 
-void OutputComponent::process() {};
-void OutputComponent::workButton() {};
-void OutputComponent::workPotentiometer(bool up) {}; 
-void InputComponent::process() {};
+OutputComponent::OutputComponent() {};
+void OutputComponent::workButton() {Serial.println("WORK BUTTON CAIU NA CLASSE BASE!");};
+void OutputComponent::workPotentiometer(bool up) {Serial.println("WORK POTENTIOMETER CAIU NA CLASSE ERRADA!");}; 
 
-ButtonComponent::ButtonComponent(int port1, int port2) 
+InputComponent::InputComponent() {};
+void InputComponent::process(LinkedList<OutputComponent*> *linkedComponents) {};
+
+/*/////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////// 
+///////////////////////////////////////////////////////////////
+///////////// BUTTON COMPONENT IMPLEMENTATION /////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////*/
+#pragma region Button
+ButtonComponent::ButtonComponent(int port1, int port2, int position) 
 {
   ports[0] = port1;
   ports[1] = port2;
+  gridPosition = position;
+  buttonPressed = false;
   arduinoButton = new GFButton(port1);
-  arduinoButton->setPressHandler(ButtonComponent::controlPress);
-  Serial.println("instanciou botao");
-
+  Serial.println("botao " + String(gridPosition) + " conectado");
 };
 
-void ButtonComponent::controlPress()
+ButtonComponent::~ButtonComponent() 
 {
-  Serial.println("apertou botao");
-  for (int i = 0; i < connectedComponents->size(); i++) 
-  {
-    connectedComponents->get(i).workButton();
-    Serial.println(i);
-  }
-}
+  delete(arduinoButton);
+  Serial.println("botao " + String(gridPosition) + " desconectado");
+};
     
-void ButtonComponent::process()
+void ButtonComponent::process(LinkedList<OutputComponent*> *linkedComponents)
 {
-  arduinoButton->process();
+  if (arduinoButton->isPressed())
+  {
+    lastPressed = millis();
+    if (!buttonPressed)
+    {
+      buttonPressed = true;
+      
+      // process button press 
+      Serial.println("botao " + String(gridPosition) + " apertado");
+      for (int i = 0; i < linkedComponents->size(); i++) 
+      {
+        linkedComponents->get(i)->workButton();
+      }
+    }    
+  }
+  else
+  {
+    // treat debounce
+    if (millis() > lastPressed + debounceTimer)
+    {
+      if (buttonPressed)
+      {
+        Serial.println("botao " + String(gridPosition) + " solto");
+      }
+      buttonPressed = false;
+    }
+  }
 };
+#pragma endregion Button
 
+/*/////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////// 
+///////////////////////////////////////////////////////////////
+//////////// ENCODER COMPONENT IMPLEMENTATION /////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////*/
+#pragma region Encoder
 // void EncoderComponent::tickDoEncoder() 
 // {
 //   encoder->tick();
@@ -76,70 +117,154 @@ void ButtonComponent::process()
 //  }
 //  lastPosition = currentPosition;
 // };
+#pragma endregion Encoder
 
+/*/////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////// 
+///////////////////////////////////////////////////////////////
+//////// POTENTIOMETER COMPONENT IMPLEMENTATION ///////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////*/
+#pragma region Potentiometer
+PotentiometerComponent::PotentiometerComponent(int port1, int port2, int position) 
+{
+  ports[0] = port1;
+  ports[1] = port2;
+  gridPosition = position;
+
+  pinMode(ports[0], INPUT);
+  Serial.println("potenciomentro " + String(gridPosition) + " conectado");
+};
+
+PotentiometerComponent::~PotentiometerComponent() 
+{
+  Serial.println("potenciomentro " + String(gridPosition) + " desconectado");
+};
+    
+void PotentiometerComponent::process(LinkedList<OutputComponent*> *linkedComponents)
+{
+  int value = map(analogRead(ports[0]), 0, 1023, minValue, maxValue);
+  Serial.println(value);
+};
+#pragma endregion Potentiometer
+
+/*/////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////// 
+///////////////////////////////////////////////////////////////
+//////////////// LED COMPONENT IMPLEMENTATION /////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////*/
+#pragma region Led
 void LedComponent::turnOn(void)
 {
-  digitalWrite(ports[0], LOW);
+  Serial.println("led " + String(gridPosition) + " ligado");
+  digitalWrite(ports[0], HIGH);
   ledOn = true;
 };
+
 void LedComponent::turnOff(void)
 {
-  digitalWrite(ports[0], HIGH);  
+  Serial.println("led " + String(gridPosition) + " desligado");
+  digitalWrite(ports[0], LOW);  
   ledOn = false;
 };
-LedComponent::LedComponent(int ports [2]) 
+
+LedComponent::LedComponent(int port1, int port2, int position) 
 {
-  pinMode(ports[0], OUTPUT);
+  gridPosition = position;
+  ports[0] = port1;
+  ports[1] = port2;
+  pinMode(port1, OUTPUT);
+  Serial.println("led " + String(gridPosition) + " conectado");
 };
-void LedComponent::workPotentiometer(bool up)
+
+LedComponent::~LedComponent() 
 {
-  if (up)
-  {
-    blinkInterval -= blinkIntervalSteps;
-    if (blinkInterval < blinkIntervalMin)
-    {
-      blinkInterval = blinkIntervalMin;
-    }
-  }
-  else
-  {
-    blinkInterval += blinkIntervalSteps;
-    if (blinkInterval > blinkIntervalMax)
-    {
-      blinkInterval = blinkIntervalMax;
-    }
-  }
+  digitalWrite(ports[0], LOW);
+  Serial.println("led " + String(gridPosition) + " desconectado");
 };
+
+void LedComponent::workPotentiometer(bool up) { };
+
 void LedComponent::workButton(void)
 {
-  if (ledBlinking)
+  if (ledOn)
   {
-    ledBlinking = false;
     turnOff();
   }
   else
   {
-    ledBlinking = true;
-    lastInstant = millis();
     turnOn();
   }
 };
-void LedComponent::process(void)
+#pragma endregion Led
+
+
+/*/////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////// 
+///////////////////////////////////////////////////////////////
+//////////// BUZZER COMPONENT IMPLEMENTATION //////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////*/
+#pragma region Buzzer
+BuzzerComponent::BuzzerComponent(int port1, int port2, int position) 
 {
-  if (ledBlinking)
+  gridPosition = position;
+  ports[0] = port1;
+  ports[1] = port2;
+
+  pinMode(ports[0], OUTPUT);
+  pinMode(ports[1], OUTPUT);
+  digitalWrite(ports[1], LOW);
+
+  Serial.println("buzzer " + String(gridPosition) + " conectado");
+};
+
+BuzzerComponent::~BuzzerComponent() 
+{
+  digitalWrite(ports[0], LOW);
+  Serial.println("buzzer " + String(gridPosition) + " desconectado");
+};
+
+void BuzzerComponent::turnOn(void)
+{
+  Serial.println("buzzer " + String(gridPosition) + " ligado");
+  tone(ports[0], buzzFrequency);
+  buzzerOn = true;
+};
+
+void BuzzerComponent::turnOff(void)
+{
+  Serial.println("buzzer " + String(gridPosition) + " desligado");
+  noTone(ports[0]);  
+  buzzerOn = false;
+};
+
+void BuzzerComponent::workButton(void) 
+{
+  if (buzzerOn)
   {
-    unsigned long currentInstant = millis();
-    if (currentInstant > lastInstant + blinkInterval) 
-    {
-      if (ledOn)
-      {
-        turnOff();
-      }
-      else
-      {
-        turnOn();
-      }
-      lastInstant = currentInstant;
-    }
+    turnOff();
+  }
+  else
+  {
+    turnOn();
   }
 };
+
+void BuzzerComponent::workPotentiometer(bool up) {};
+void BuzzerComponent::workEncoder(bool up) {};
+#pragma endregion Buzzer
+
+
+
+
+
+
+
+
+
+
