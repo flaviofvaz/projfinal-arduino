@@ -1,74 +1,96 @@
 #include "Components.h"
 
-int numPorts = 16;
 int inputPortsNum = 4;
 int outputPortsNum = 4; 
 
-int idPorts [16] = {A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15};
-int signalPorts [16][3] = { {0,0,0}, {0,0,1}, {0,0,2}, {0,0,3}, {0,0,4}, {0,0,5}, {0,0,6}, {0,0,7}, {11,0,8}, {0,0,9}, {13,5,10}, {0,0,11}, {0,0,12}, {0,0,13}, {0,0,14}, {0,0,15} };
+int inputIdPorts[4] = { A0, A1, A2, A3 };
+int outputIdPorts[4] = { A12, A13, A14, A15 };
 
-int componentsConnected [16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int inputSignalPorts[4][3] = { {11,0,0}, {0,0,1}, {0,0,2}, {0,0,3} }; 
+int outputSignalPorts[4][3] = { {13,5,0}, {2,0,1}, {0,0,2}, {0,0,3} };
+
+int inputComponentsConnected[4] = {0, 0, 0, 0};
+int outputComponentsConnected[4] = {0, 0, 0, 0};
+int linkedComponents[4][4] = { {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
+
+InputComponent* inputComponentInstances[4];
+OutputComponent* outputComponentInstances[4];
+
 LinkedList<OutputComponent*> *links = new LinkedList<OutputComponent*>();
 
-InputComponent* inputComponentInstances [16];
-OutputComponent* outputComponentInstances [16];
-
-int linkedComponents[4][4];
-
-void initLinks()
-{
-  for (int i = 0; i < inputPortsNum; i++)
-  {
-    for (int j = 0; j < outputPortsNum; j++)
-    {
-      linkedComponents[i][j] = 0;
-    }
-  }
-}
-
+// STUB FUNCTION - REPLACE WITH FUNCTION THAT CHECKS WHAT COMPONENT IS IN THAT PORT
 int stubFunction(int port)
 {
-  if (port == A8)
+  if (port == A0)
   {
     return 1;
   }
-  else if (port == A10)
+  else if (port == A12)
   {
     return 4;
+  }
+  else if (port == A13)
+  {
+    return 3;
   }
   return 0;
 }
 
-// STUB FUNCTION
-void isLinked(int portA, int portB)
+// STUB FUNCTION - REPLACE WITH FUNCTION THAT CHECKS IF COMPONENT IN inPort IS LINKED TO COMPONENT IN outPort
+int isLinked(int inPort, int outPort)
 {
-  if (idPorts[portA] == A8 && idPorts[portB] == A10)
+  //Serial.println(outPort);
+  if (inPort == 0 && outPort == 0) // replace by a check if it's linked
   {
-    linkedComponents[portA][portB] = 1;
-    Serial.println("ligacao " + String(signalPorts[portA][2]) + " " + String(signalPorts[portB][2]));
+    if (linkedComponents[inPort][outPort] == 0)
+    {
+      Serial.println("ligacao " + String(inputSignalPorts[inPort][2]) + " " + String(outputSignalPorts[outPort][2]) + " feita");
+      linkedComponents[inPort][outPort] = 1;
+    } 
+    return 1;
+  }
+  else
+  {
+    // if it was connected but it isn't anymore then we say it's disconnected
+    if (linkedComponents[inPort][outPort] == 1)
+    {
+      Serial.println("ligacao " + String(inputSignalPorts[inPort][2]) + " " + String(outputSignalPorts[outPort][2]) + " desfeita");
+      linkedComponents[inPort][outPort] = 0;
+    }
+    return 0;
   }
 }
 
-void stubGetComponentsConnected(int port)
+void stubGetComponentsConnected(int inPort)
 {
-
   // free memory
   while (links->size() > 0)
   {
     links->remove(0);
   }
 
-  links->add(outputComponentInstances[10]);
+  // build links matrice
+  for (int outPort = 0; outPort < outputPortsNum; outPort++)
+  {
+    if (outputComponentsConnected[outPort] == 3 || outputComponentsConnected[outPort] == 4)
+    {
+      if(isLinked(inPort, outPort))
+      {
+        //Serial.println("Adicionando a lista do componente de entrada " + String(inPort) + " o componente de saida " + String(outPort));
+        links->add(outputComponentInstances[outPort]);
+      }
+    }
+  }
 }
 
 void processComponents(void)
 {
-  for (int i = 0; i < numPorts; i++)
+  for (int inputPort = 0; inputPort < inputPortsNum; inputPort++)
   {
-    if (componentsConnected[i] == 1 || componentsConnected[i] == 2)
+    if (inputComponentsConnected[inputPort] == 1 || inputComponentsConnected[inputPort] == 2)
     {
-      stubGetComponentsConnected(i);
-      inputComponentInstances[i]->process(links); 
+      stubGetComponentsConnected(inputPort);
+      inputComponentInstances[inputPort]->process(links); 
     }
   }
 }
@@ -77,54 +99,36 @@ void setup()
 {
   Serial.begin(9600);
   Serial.println("iniciou arduino");
-  initLinks();
 }
 
 void loop() 
 {
-  // loop through all ports
-  for (int i = 0; i < numPorts; i++)
+  // loop through all input ports
+  for (int i = 0; i < inputPortsNum; i++)
   {
     /* check if there's component connected to the port and what component is it: 
     1 - button, 2 - potentiometer, 3 - led, 4 - buzzer, 0 - nothing */
 
-    int componentType = stubFunction(idPorts[i]);
-    int currentComponent = componentsConnected[i];
+    int componentType = stubFunction(inputIdPorts[i]);
+    int currentComponent = inputComponentsConnected[i];
 
     // if component found is the same of the one connected, continue
     if (componentType != currentComponent)
     {
       // update connected component in current port
-      componentsConnected[i] = componentType;
+      inputComponentsConnected[i] = componentType;
 
       // if component found is different from the one connected, "delete" the old one and create a new one
       switch (componentType)
       {
         case 0: // nothing
-          //finishedConnection(i, currentComponent);
-          delete(outputComponentInstances[i]);
+          delete(inputComponentInstances[i]);
           break;
         case 1:
-          inputComponentInstances[i] = new ButtonComponent(signalPorts[i][0], signalPorts[i][1], signalPorts[i][2]);
-          // Serial.println(signalPorts[i][0]);
-          // Serial.println(signalPorts[i][1]);
+          inputComponentInstances[i] = new ButtonComponent(inputSignalPorts[i][0], inputSignalPorts[i][1], inputSignalPorts[i][2]);
           break;
         case 2:
-          //inputComponentInstances[i] = new EncoderComponent(signalPorts[i][0], signalPorts[i][1], signalPorts[i][2]);
-
-          Serial.println(signalPorts[i][0]);
-          Serial.println(signalPorts[i][1]);
-          break;
-        case 3:
-          outputComponentInstances[i] = new LedComponent(signalPorts[i][0], signalPorts[i][1], signalPorts[i][2]);
-          // Serial.println(signalPorts[i][0]);
-          // Serial.println(signalPorts[i][1]);
-          break;
-        case 4:
-          outputComponentInstances[i] = new BuzzerComponent(signalPorts[i][0], signalPorts[i][1], signalPorts[i][2]);
-
-          Serial.println(signalPorts[i][0]);
-          Serial.println(signalPorts[i][1]);
+          //inputComponentInstances[i] = new EncoderComponent(inputSignalPorts[i][0], inputSignalPorts[i][1], inputSignalPorts[i][2]);
           break;
         default: // to be implemented components
           break;
@@ -132,6 +136,38 @@ void loop()
     }
   }
 
+  // loop through all input ports
+  for (int i = 0; i < outputPortsNum; i++)
+  {
+    /* check if there's component connected to the port and what component is it: 
+    1 - button, 2 - potentiometer, 3 - led, 4 - buzzer, 0 - nothing */
+
+    int componentType = stubFunction(outputIdPorts[i]);
+    int currentComponent = outputComponentsConnected[i];
+
+    // if component found is the same of the one connected, continue
+    if (componentType != currentComponent)
+    {
+      // update connected component in current port
+      outputComponentsConnected[i] = componentType;
+
+      // if component found is different from the one connected, "delete" the old one and create a new one
+      switch (componentType)
+      {
+        case 0: // nothing
+          delete(outputComponentInstances[i]);
+          break;
+        case 3:
+          outputComponentInstances[i] = new LedComponent(outputSignalPorts[i][0], outputSignalPorts[i][1], outputSignalPorts[i][2]);
+          break;
+        case 4:
+          outputComponentInstances[i] = new BuzzerComponent(outputSignalPorts[i][0], outputSignalPorts[i][1], outputSignalPorts[i][2]);
+          break;
+        default: // to be implemented components
+          break;
+      }
+    }
+  }
   // process components
   processComponents();
 }
